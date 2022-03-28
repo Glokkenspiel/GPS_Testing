@@ -20,10 +20,12 @@
 
 using namespace vex;
 
-int tLeft = 0;
-int tRight = 1;
+float baseRat = 101.6; //1:1 ratio for gears and 4" wheel in mm
 
+bool tLeft = 0;
+bool tRight = 1; 
 
+//////////////////////
 
 float pheta1;
 float pheta2;
@@ -33,6 +35,12 @@ int aQuadrant;
 int pQuadrant;
 
 bool lr;
+
+//////////////////////
+
+float bStart;
+float bEnd;
+float midD;
 
 /*---Drive in a strait line---*/
 void baseS(directionType dir, float speed){
@@ -62,12 +70,36 @@ void baseA(directionType dir, bool lORr, float speed, float offset){
   }
 }
 
-void baseActT()
-
 /*---Stop the base---*/
 void baseST(){
   leftBase.stop();
   rightBase.stop();
+}
+
+/*---Make a turn to a specific angle---*/
+void baseActT(float aTgt){
+  for(int i = 0; i < 3; i++){
+    if(GPS.heading()+180 >= aTgt || GPS.heading()-180 < aTgt){
+      while(GPS.heading() >= aTgt){
+        baseT(tLeft, 100/((4*i)+1));
+      }
+    }else{
+      while(GPS.heading() >= aTgt){
+        baseT(tRight, 100/((4*i)+1));
+      }
+    }
+  }
+  baseST();
+}
+
+/*---Drive a specific distance---*/
+void baseActS(float dist){
+  bStart = leftBase.position(degrees);
+  bEnd = bStart+(dist/(baseRat/360));
+  while(leftBase.position(degrees) < bEnd){
+    baseS(fwd, 100/(9*((leftBase.position(degrees)-bStart)/dist)+1));
+  }
+  baseST();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -127,28 +159,35 @@ void findA(float xTgt, float yTgt){
   usePheta(xTgt, yTgt);
 }
 
-void turnDirection(){
-  if(((aQuadrant+1 || aQuadrant-3) == pQuadrant) || (aQuadrant == pQuadrant && GPS.heading() >= midA) || ((aQuadrant+2 == pQuadrant || aQuadrant-2 == pQuadrant) && (GPS.heading()+180 <= midA || GPS.heading()-180 <= midA))){
-    lr = tLeft;
-  }else{
-    lr = tRight;
-  }
-}
 
 /*---Turn to point---*/
 void tTP(float xTgt, float yTgt){
   findA(xTgt, yTgt);
-  turnDirection();
-  actTurn(midA, 100);
+  baseActT(midA);
+}
+
+//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\//\\
+
+/*---Find a specific distance---*/
+void findDist(float xTgt, float yTgt){
+  midD = sqrt(pow(xTgt-GPS.xPosition(mm), 2)+pow(yTgt-GPS.yPosition(mm), 2));
 }
 
 /*---Drive to a point---*/
-void dTP(float xTgt, float yTgt, float aTgt){
+void dTP(float xTgt, float yTgt){
+  findDist(xTgt, yTgt);
+  baseActS(midD);
+}
+
+/*---Drive to a point and face an angle---*/
+void dTPA(float xTgt, float yTgt, float aTgt){
   tTP(xTgt, yTgt);
+  dTP(xTgt, yTgt);
+  baseActT(aTgt);
 }
 
 int main() {
   // Initializing Robot Configuration. DO NOT REMOVE!
   vexcodeInit();
-  
+  dTPA(0, 0, 180);
 }
